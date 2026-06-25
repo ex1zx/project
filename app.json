@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "Project",
+    "slug": "project",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "project",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050a05"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "يحتاج التطبيق إلى الكاميرا للكشف عن إيماءات اليد"
+      }
+    },
+    "android": {
+      "package": "com.project.handgesture",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.USB_PERMISSION",
+        "android.hardware.usb.host"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "يحتاج Project إلى الكاميرا للكشف عن إيماءات اليد",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": false
+    }
+  }
+}

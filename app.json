@@ -10,7 +10,8 @@
     "android": {
       "package": "com.project.handgesture",
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -26,6 +27,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "21c21f2a-3568-4ec5-848f-302098834c2d"
+      }
+    },
+    "owner": "executioner-exec"
   }
 }

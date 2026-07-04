@@ -1,21 +1,12 @@
 {
   "expo": {
-    "name": "Project",
+    "name": "Hand Gesture Detector",
     "slug": "project",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
     "scheme": "project",
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
-    "splash": {
-      "image": "./assets/images/icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#050a05"
-    },
-    "ios": {
-      "supportsTablet": false
-    },
     "android": {
       "package": "com.project.handgesture",
       "permissions": [

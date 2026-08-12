@@ -7,6 +7,7 @@ import android.graphics.Path
 import android.util.AttributeSet
 import android.view.View
 import kotlin.math.max
+import kotlin.math.abs
 
 data class NormalizedPoint(val x: Float, val y: Float)
 
@@ -68,7 +69,10 @@ class HandOverlayView @JvmOverloads constructor(
         } else {
             target
         }
-        current = next
+        val stillMoving = next.zip(target).any { (a, b) ->
+            abs(a.x - b.x) > 0.0015f || abs(a.y - b.y) > 0.0015f
+        }
+        current = if (stillMoving) next else target
 
         fun screenPoint(point: NormalizedPoint): Pair<Float, Float> {
             val x = (if (mirrored) 1f - point.x else point.x) * width
@@ -89,6 +93,6 @@ class HandOverlayView @JvmOverloads constructor(
             val (x, y) = screenPoint(it)
             canvas.drawCircle(x, y, max(4f, width * 0.008f), dotPaint)
         }
-        if (current != target) postInvalidateOnAnimation()
+        if (stillMoving) postInvalidateOnAnimation()
     }
 }

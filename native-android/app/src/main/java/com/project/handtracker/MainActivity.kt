@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
@@ -207,7 +208,9 @@ class MainActivity : ComponentActivity() {
 
     private fun analyze(image: androidx.camera.core.ImageProxy) {
         try {
-            val bitmap = YuvToRgbConverter.toBitmap(image) ?: return
+            val bitmap = YuvToRgbConverter.toBitmap(image)?.let {
+                rotateBitmap(it, image.imageInfo.rotationDegrees)
+            } ?: return
             val mpImage = BitmapImageBuilder(bitmap).build()
             val result = handLandmarker?.detect(mpImage)
             val landmarks = result?.landmarks()?.firstOrNull()
@@ -243,6 +246,20 @@ class MainActivity : ComponentActivity() {
 
     private fun distance(a: NormalizedPoint, b: NormalizedPoint): Float {
         return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y))
+    }
+
+    private fun rotateBitmap(bitmap: android.graphics.Bitmap, degrees: Int): android.graphics.Bitmap {
+        if (degrees == 0) return bitmap
+        val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+        return android.graphics.Bitmap.createBitmap(
+            bitmap,
+            0,
+            0,
+            bitmap.width,
+            bitmap.height,
+            matrix,
+            true,
+        )
     }
 
     override fun onDestroy() {

@@ -5,6 +5,8 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Size
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,8 +31,20 @@ class MainActivity : AppCompatActivity() {
     private var helper: HandLandmarkerHelper? = null
     private lateinit var usb: UsbSerialManager
 
-    private var lastSent = -1
-    private var lastSentAt = 0L
+    private var currentValue = -1
+
+    /** فاصل تكرار إرسال نفس الإشارة (مللي ثانية) */
+    private val repeatIntervalMs = 150L
+    private val repeatHandler = Handler(Looper.getMainLooper())
+    private val repeatRunnable = object : Runnable {
+        override fun run() {
+            val v = currentValue
+            if (v > 0) {
+                usb.send(v)
+                repeatHandler.postDelayed(this, repeatIntervalMs)
+            }
+        }
+    }
 
     private val cameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -95,13 +109,13 @@ class MainActivity : AppCompatActivity() {
                             overlay.setResults(pts, rotated.width, rotated.height)
                             counterText.text = fingers.toString()
                         }
-                        maybeSend(fingers)
+                        updateSignal(fingers)
                     } else {
                         runOnUiThread {
                             overlay.clear()
                             counterText.text = "0"
                         }
-                        maybeSend(0)
+                        updateSignal(0)
                     }
                     rotated.recycle(); bmp.recycle()
                 } catch (_: Throwable) {
@@ -117,13 +131,17 @@ class MainActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    /** يرسل الرقم عند تغيّره فقط (مع حد أدنى زمني) */
-    private fun maybeSend(value: Int) {
-        val now = System.currentTimeMillis()
-        if (value != lastSent && now - lastSentAt > 150) {
-            lastSent = value
-            lastSentAt = now
-            usb.send(value)
+    /**
+     * يحافظ على استمرار إرسال نفس الإشارة طالما بقي عدد الأصابع كما هو،
+     * ويتوقف فقط عند تغيّر العدد أو اختفاء اليد (0).
+     */
+    private fun updateSignal(value: Int) {
+        if (value == currentValue) return
+        currentValue = value
+        repeatHandler.removeCallbacks(repeatRunnable)
+        usb.send(value)
+        if (value > 0) {
+            repeatHandler.postDelayed(repeatRunnable, repeatIntervalMs)
         }
     }
 
@@ -134,6 +152,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        repeatHandler.removeCallbacks(repeatRunnable)
         usb.unregister()
         analysisExecutor.execute { helper?.close() }
         analysisExecutor.shutdown()

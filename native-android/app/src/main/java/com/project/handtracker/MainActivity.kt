@@ -139,14 +139,14 @@ class MainActivity : ComponentActivity() {
         }
         val permissionTitle = TextView(this).apply {
             text = "نحتاج إلى الكاميرا"
-            textColor = Color.WHITE
+            setTextColor(Color.WHITE)
             textSize = 22f
             gravity = Gravity.CENTER
             typeface = Typeface.DEFAULT_BOLD
         }
         val permissionBody = TextView(this).apply {
             text = "تعمل المعالجة على الهاتف فقط. اسمح بالكاميرا لبدء المرآة وتتبع الكف."
-            textColor = getColor(R.color.project_dim)
+            setTextColor(getColor(R.color.project_dim))
             textSize = 14f
             gravity = Gravity.CENTER
             setPadding(0, 12, 0, 18)

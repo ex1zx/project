@@ -23,20 +23,46 @@ export function useUsbSerial(): UsbSerialState {
   const [deviceName] = useState<string | null>(null);
   const [lastSent, setLastSent] = useState<number>(-1);
   const lastCountRef = useRef<number>(-1);
+  const repeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const sendSignal = useCallback(async (fingerCount: number) => {
-    if (fingerCount === lastCountRef.current) return;
-    if (fingerCount < 0 || fingerCount > 5) return;
+  // Repeat interval (ms) used to keep the same signal alive continuously.
+  const REPEAT_INTERVAL_MS = 150;
 
-    lastCountRef.current = fingerCount;
-    setLastSent(fingerCount);
+  const stopRepeat = useCallback(() => {
+    if (repeatTimerRef.current) {
+      clearInterval(repeatTimerRef.current);
+      repeatTimerRef.current = null;
+    }
+  }, []);
 
+  const write = useCallback((fingerCount: number) => {
     // In a native build, replace this with:
     // await UsbSerial.write(`${fingerCount}\n`);
     if (__DEV__) {
       console.log(`[USB stub] Signal: ${fingerCount}`);
     }
   }, []);
+
+  // Keeps sending the same finger count continuously until the count
+  // changes or the hand disappears (0).
+  const sendSignal = useCallback(async (fingerCount: number) => {
+    if (fingerCount < 0 || fingerCount > 5) return;
+    if (fingerCount === lastCountRef.current) return;
+
+    lastCountRef.current = fingerCount;
+    setLastSent(fingerCount);
+
+    stopRepeat();
+    write(fingerCount);
+
+    if (fingerCount > 0) {
+      repeatTimerRef.current = setInterval(() => {
+        write(fingerCount);
+      }, REPEAT_INTERVAL_MS);
+    }
+  }, [stopRepeat, write]);
+
+  useEffect(() => stopRepeat, [stopRepeat]);
 
   return { isConnected, deviceName, sendSignal, lastSent };
 }

@@ -63,10 +63,11 @@ val downloadHandModel by tasks.registering {
     doLast {
         if (!modelFile.exists() || modelFile.length() < 1_000_000) {
             modelFile.parentFile.mkdirs()
-            val url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-            java.net.URL(url).openStream().use { input ->
+            val modelUrl = uri("https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task").toURL()
+            modelUrl.openStream().use { input ->
                 modelFile.outputStream().use { output -> input.copyTo(output) }
             }
+
         }
     }
 }

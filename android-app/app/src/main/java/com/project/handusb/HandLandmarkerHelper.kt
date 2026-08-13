@@ -20,9 +20,9 @@ class HandLandmarkerHelper(context: Context) {
         val options = HandLandmarker.HandLandmarkerOptions.builder()
             .setBaseOptions(base)
             .setNumHands(1)
-            .setMinHandDetectionConfidence(0.5f)
-            .setMinTrackingConfidence(0.5f)
-            .setMinHandPresenceConfidence(0.5f)
+            .setMinHandDetectionConfidence(0.35f)
+            .setMinTrackingConfidence(0.35f)
+            .setMinHandPresenceConfidence(0.35f)
             .setRunningMode(RunningMode.IMAGE)
             .build()
         landmarker = HandLandmarker.createFromOptions(context, options)
@@ -34,18 +34,25 @@ class HandLandmarkerHelper(context: Context) {
     fun close() = landmarker.close()
 
     companion object {
-        /** عدّ الأصابع المرفوعة من النقاط المطبّعة */
+        /**
+         * عدّ الأصابع المرفوعة بطريقة لا تتأثر بدوران اليد:
+         * الإصبع مرفوع إذا كان طرفه أبعد عن الرسغ من مفصله الأوسط.
+         */
         fun countFingers(pts: FloatArray, mirrored: Boolean): Int {
             fun x(i: Int) = pts[i * 2]
             fun y(i: Int) = pts[i * 2 + 1]
-            var count = 0
-            // الأصابع الأربعة: الطرف أعلى من المفصل الأوسط
-            for ((tip, pip) in listOf(8 to 6, 12 to 10, 16 to 14, 20 to 18)) {
-                if (y(tip) < y(pip)) count++
+            fun dist(a: Int, b: Int): Float {
+                val dx = x(a) - x(b); val dy = y(a) - y(b)
+                return kotlin.math.sqrt(dx * dx + dy * dy)
             }
-            // الإبهام: مقارنة أفقية
-            val thumbOut = if (mirrored) x(4) > x(3) else x(4) < x(3)
-            if (thumbOut && kotlin.math.abs(x(4) - x(17)) > kotlin.math.abs(x(3) - x(17))) count++
+            // مقياس اليد لتطبيع القرارات
+            val palm = dist(0, 9).coerceAtLeast(1e-4f)
+            var count = 0
+            for ((tip, pip) in listOf(8 to 6, 12 to 10, 16 to 14, 20 to 18)) {
+                if (dist(tip, 0) > dist(pip, 0) * 1.08f) count++
+            }
+            // الإبهام: بعد الطرف عن مفصل الخنصر مقارنة بالمفصل السفلي للإبهام
+            if (dist(4, 17) > dist(2, 17) * 1.12f && dist(4, 0) > palm * 0.9f) count++
             return count.coerceIn(0, 5)
         }
     }

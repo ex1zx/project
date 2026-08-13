@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -33,7 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sender: SignalSender
 
     /** عدد الإطارات المتتالية المطلوبة لاعتماد عدد أصابع جديد (يمنع الرفرفة) */
-    private val stableFrames = 3
+    private val stableFrames = 2
     private var candidate = -1
     private var candidateCount = 0
 
@@ -62,7 +63,13 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { counterText.text = if (v > 0) "$v ▶" else "0" }
         }
 
-        analysisExecutor.execute { helper = HandLandmarkerHelper(this) }
+        analysisExecutor.execute {
+            try {
+                helper = HandLandmarkerHelper(this)
+            } catch (t: Throwable) {
+                runOnUiThread { counterText.text = "خطأ في تحميل نموذج اليد" }
+            }
+        }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED
@@ -88,13 +95,12 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val h = helper
                     if (h == null) { image.close(); return@setAnalyzer }
-                    val bmp = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-                    bmp.copyPixelsFromBuffer(image.planes[0].buffer)
+                    val src = image.toBitmap()
                     val m = Matrix().apply {
                         postRotate(image.imageInfo.rotationDegrees.toFloat())
                         postScale(-1f, 1f) // مرآة للكاميرا الأمامية
                     }
-                    val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+                    val rotated = Bitmap.createBitmap(src, 0, 0, src.width, src.height, m, true)
                     val result = h.detect(rotated)
                     val lms = result?.landmarks()?.firstOrNull()
                     if (lms != null && lms.size == 21) {
@@ -116,7 +122,8 @@ class MainActivity : AppCompatActivity() {
                             sender.setValue(0)
                         }
                     }
-                    rotated.recycle(); bmp.recycle()
+                    if (rotated !== src) rotated.recycle()
+                    src.recycle()
                 } catch (_: Throwable) {
                 } finally {
                     image.close()

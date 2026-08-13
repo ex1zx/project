@@ -5,9 +5,9 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
+import android.os.SystemClock
 import android.util.Size
+import android.view.WindowManager
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -30,21 +30,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var analysisExecutor: ExecutorService
     private var helper: HandLandmarkerHelper? = null
     private lateinit var usb: UsbSerialManager
+    private lateinit var sender: SignalSender
 
-    private var currentValue = -1
+    /** عدد الإطارات المتتالية المطلوبة لاعتماد عدد أصابع جديد (يمنع الرفرفة) */
+    private val stableFrames = 3
+    private var candidate = -1
+    private var candidateCount = 0
 
-    /** فاصل تكرار إرسال نفس الإشارة (مللي ثانية) */
-    private val repeatIntervalMs = 150L
-    private val repeatHandler = Handler(Looper.getMainLooper())
-    private val repeatRunnable = object : Runnable {
-        override fun run() {
-            val v = currentValue
-            if (v > 0) {
-                usb.send(v)
-                repeatHandler.postDelayed(this, repeatIntervalMs)
-            }
-        }
-    }
+    /** مهلة سماح قبل اعتبار اليد مختفية فعلاً (مللي ثانية) */
+    private val handLostGraceMs = 600L
+    private var lastHandSeenMs = 0L
 
     private val cameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -53,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         previewView = findViewById(R.id.viewFinder)
         overlay = findViewById(R.id.overlay)
@@ -62,6 +58,9 @@ class MainActivity : AppCompatActivity() {
         analysisExecutor = Executors.newSingleThreadExecutor()
         usb = UsbSerialManager(this) { s -> runOnUiThread { usbText.text = s } }
         usb.register()
+        sender = SignalSender(usb) { v ->
+            runOnUiThread { counterText.text = if (v > 0) "$v ▶" else "0" }
+        }
 
         analysisExecutor.execute { helper = HandLandmarkerHelper(this) }
 
@@ -105,17 +104,17 @@ class MainActivity : AppCompatActivity() {
                             pts[i * 2 + 1] = lm.y()
                         }
                         val fingers = HandLandmarkerHelper.countFingers(pts, true)
-                        runOnUiThread {
-                            overlay.setResults(pts, rotated.width, rotated.height)
-                            counterText.text = fingers.toString()
-                        }
-                        updateSignal(fingers)
+                        lastHandSeenMs = SystemClock.elapsedRealtime()
+                        runOnUiThread { overlay.setResults(pts, rotated.width, rotated.height) }
+                        onFingers(fingers)
                     } else {
-                        runOnUiThread {
-                            overlay.clear()
-                            counterText.text = "0"
+                        runOnUiThread { overlay.clear() }
+                        // لا نوقف الإرسال فوراً: فقط بعد انتهاء مهلة السماح
+                        if (SystemClock.elapsedRealtime() - lastHandSeenMs > handLostGraceMs) {
+                            candidate = 0
+                            candidateCount = stableFrames
+                            sender.setValue(0)
                         }
-                        updateSignal(0)
                     }
                     rotated.recycle(); bmp.recycle()
                 } catch (_: Throwable) {
@@ -132,16 +131,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * يحافظ على استمرار إرسال نفس الإشارة طالما بقي عدد الأصابع كما هو،
-     * ويتوقف فقط عند تغيّر العدد أو اختفاء اليد (0).
+     * يعتمد العدد الجديد فقط بعد ثباته عدة إطارات، ثم يسلّمه للمُرسل المستمر.
+     * المُرسل يبقي الإشارة مستمرة بدون انقطاع حتى يتغيّر العدد أو يصبح صفراً.
      */
-    private fun updateSignal(value: Int) {
-        if (value == currentValue) return
-        currentValue = value
-        repeatHandler.removeCallbacks(repeatRunnable)
-        usb.send(value)
-        if (value > 0) {
-            repeatHandler.postDelayed(repeatRunnable, repeatIntervalMs)
+    private fun onFingers(fingers: Int) {
+        if (fingers == candidate) {
+            if (candidateCount < stableFrames) candidateCount++
+        } else {
+            candidate = fingers
+            candidateCount = 1
+        }
+        if (candidateCount >= stableFrames || fingers == sender.currentValue()) {
+            sender.setValue(fingers)
         }
     }
 
@@ -152,7 +153,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        repeatHandler.removeCallbacks(repeatRunnable)
+        sender.setValue(0)
+        sender.stop()
         usb.unregister()
         analysisExecutor.execute { helper?.close() }
         analysisExecutor.shutdown()

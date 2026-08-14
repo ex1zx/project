@@ -14,25 +14,61 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <TextView
-        android:id="@+id/fingerCount"
+    <!-- بطاقة عدد الأصابع -->
+    <FrameLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_margin="18dp"
-        android:text="0"
-        android:textColor="#FFFFFF"
-        android:textSize="28sp"
-        android:textStyle="bold"
-        android:alpha="0.9" />
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="40dp"
+        android:background="@drawable/bg_counter"
+        android:paddingStart="30dp"
+        android:paddingEnd="30dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@+id/fingerCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="0"
+            android:textColor="#00E5A0"
+            android:textSize="46sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:shadowColor="#8000E5A0"
+            android:shadowRadius="18"
+            android:shadowDx="0"
+            android:shadowDy="0" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/usbStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
-        android:layout_margin="18dp"
+        android:layout_margin="16dp"
+        android:background="@drawable/bg_pill"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
         android:textColor="#9AF7C0"
         android:textSize="12sp"
         android:text="USB: -" />
+
+    <TextView
+        android:id="@+id/fpsStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_margin="16dp"
+        android:background="@drawable/bg_pill"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:textColor="#CFE9FF"
+        android:textSize="12sp"
+        android:text="-- FPS" />
 </FrameLayout>

@@ -2,21 +2,21 @@ package com.project.handusb
 
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Process
 
 /**
- * مُرسل الإشارة المستمر.
- *
- * القاعدة:
- *  - طالما هناك عدد أصابع مرفوعة (1..5) يبقى الإرسال مستمراً بدون انقطاع.
- *  - عند تغيّر عدد الأصابع ينتقل فوراً إلى الإشارة الجديدة ويستمر بها.
- *  - عند اختفاء اليد بالكامل أو عندما يصبح العدد صفراً يتوقف الإرسال.
+ * مُرسل الإشارة اللحظي (بدون أي تأخير):
+ *  - أي تغيّر في عدد الأصابع يُرسل فوراً على خيط ذي أولوية عالية.
+ *  - تستمر إشارة الاستمرارية (keep-alive) بفاصل قصير جداً للحفاظ على الاتصال.
+ *  - عند صفر أصابع أو اختفاء اليد يتوقف الإرسال فوراً.
  */
 class SignalSender(
     private val usb: UsbSerialManager,
-    private val intervalMs: Long = 80L,
+    private val keepAliveMs: Long = 25L,
     private val onValueChanged: (Int) -> Unit = {}
 ) {
-    private val thread = HandlerThread("signal-sender").apply { start() }
+    private val thread = HandlerThread("signal-sender", Process.THREAD_PRIORITY_URGENT_AUDIO)
+        .apply { start() }
     private val handler = Handler(thread.looper)
 
     @Volatile private var value: Int = 0
@@ -27,14 +27,14 @@ class SignalSender(
             val v = value
             if (v in 1..5) {
                 usb.send(v)
-                handler.postDelayed(this, intervalMs)
+                handler.postDelayed(this, keepAliveMs)
             } else {
                 running = false
             }
         }
     }
 
-    /** يضبط الإشارة الحالية؛ يبدأ/يستمر الإرسال تلقائياً. */
+    /** يضبط الإشارة الحالية ويرسلها فوراً. */
     fun setValue(newValue: Int) {
         val v = newValue.coerceIn(0, 5)
         val changed = v != value
@@ -42,21 +42,19 @@ class SignalSender(
 
         if (changed) {
             onValueChanged(v)
+            handler.removeCallbacks(loop)
             if (v == 0) {
-                // اختفاء اليد أو صفر أصابع: إيقاف الإرسال (مع إشعار واحد بالتوقف)
-                handler.removeCallbacks(loop)
                 running = false
-                handler.post { usb.send(0) }
+                handler.postAtFrontOfQueue { usb.send(0) }
                 return
             }
-            // تغيّر العدد: انتقال فوري للإشارة الجديدة بدون انقطاع
-            handler.removeCallbacks(loop)
             running = true
-            handler.post(loop)
+            // إرسال فوري للقيمة الجديدة ثم متابعة الاستمرارية
+            handler.postAtFrontOfQueue { usb.send(v) }
+            handler.postDelayed(loop, keepAliveMs)
             return
         }
 
-        // نفس القيمة: تأكد أن حلقة الإرسال ما زالت تعمل
         if (v > 0 && !running) {
             running = true
             handler.post(loop)
